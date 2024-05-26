@@ -1,12 +1,9 @@
+import re
 import threading
 import requests
 import hashlib
-import tkinter as tk
-from tkinter import messagebox, ttk
-
-# Global variable for the password entry field
-
-password_entry = None
+from tkinter import messagebox
+from gui import PasswordCheckerGUI
 
 def requests_api_data(query_string):
 	"""
@@ -54,7 +51,7 @@ def pwned_api_check(password):
 	# Get the count of password leaks using the response and the rest of the hash
 	return get_password_leaks_count(response, tail)
 
-def check_password():
+def check_password(password):
 	"""
 	Check the strength of a password using the Have I Been Pwned API.
 
@@ -70,57 +67,34 @@ def check_password():
 		None
 	"""
 	# Get the password from the entry field
-	password = password_entry.get()
+	is_secure = True
+
 	# If the password is empty, show an error message
 	if not password:
 		messagebox.showerror("Error", "Password cannot be empty.")
 		return
-
-	# Disable the check button and set the status label to "Checking..."
-	check_button.config(state=tk.DISABLED)
-	status_label.config(text="Checking...")
+	
+	# Check if the password is secure enough
+	if not re.match(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$', password):
+		is_secure = False
 
 	def callback():
-		count = pwned_api_check(password)
-		password_entry.delete(0, 'end')  # Clear the password variable
+		try:
+			count = pwned_api_check(password)
+		except Exception as e:
+			messagebox.showerror("Error", f"An error occurred: {str(e)}")
+			return
+
 		if count:
 			messagebox.showinfo("Password Check", f'Your password was found {count} times... You should probably change your password!')
 		else:
 			messagebox.showinfo("Password Check", 'Your password was NOT found. Carry on!')
-		check_button.config(state=tk.NORMAL)  # Enable the check button
-		status_label.config(text="")  # clear the status label
+		
+		if not is_secure:
+				messagebox.showinfo("Password Check", f'Your password should be at least 8 characters long and contain at least one number, one uppercase letter, one lowercase letter, and one special character. Otherwise, it isn\'t really secure, so you should consider changing your password!')
 
-	threading.Thread(target=callback).start()  # Start a new thread to run the callback function
+	threading.Thread(target = callback).start()  # Start a new thread to run the callback function
 
-# Create the GUI
-root = tk.Tk()
-root.title("Password Checker")
-
-frame = tk.Frame(root)
-frame.pack(padx = 20, pady = 20)
-
-label = tk.Label(frame, text = "Enter your password:")
-label.grid(row = 0, column = 0)
-
-password_entry = tk.Entry(frame, show = "*")
-password_entry.grid(row = 0, column = 1)
-
-check_button = tk.Button(frame, text = "Check Password", command = check_password)
-check_button.grid(row = 1, column = 0, columnspan = 2)
-
-progress_bar = ttk.Progressbar(frame, mode = 'indeterminate')
-progress_bar.grid(row = 3, column = 0, columnspan = 2)
-
-def start_progress():
-	progress_bar.start()
-
-def stop_progress():
-	progress_bar.stop()
-	progress_bar['value'] = 100
-
-check_button.config(command = lambda: [start_progress(), check_password(), stop_progress()])
-
-status_label = tk.Label(frame, text = "")
-status_label.grid(row = 2, column = 0, columnspan = 2)
-
-root.mainloop()
+# Create an instance of the PasswordCheckerGUI class
+gui = PasswordCheckerGUI(check_password)
+gui.run()
